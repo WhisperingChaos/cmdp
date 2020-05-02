@@ -1,0 +1,34 @@
+{
+	"version": "0.1.0",
+	"command": "go",
+	"isShellCommand": true,
+	"showOutput": "silent",
+	"tasks": [
+		{
+			"taskName": "install",
+			"args": [ "-v", "./..."],
+			"isBuildCommand": true
+		},
+		{
+			"taskName": "test",
+			"args": [ "-v", "./..."],
+			"isTestCommand": true
+		}
+	]
+}
+{
+	"version": "2.0.0",	
+	"type": "shell",	
+	"echoCommand": true,
+	"cwd": "${workspaceFolder}",
+	"tasks": [
+		{
+			"label": "rungo",
+			"command": "go run ${file}",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},		
+	]
+}
