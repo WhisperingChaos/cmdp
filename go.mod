@@ -1,4 +1,4 @@
-module github.com/WhisperingChaos/cmdp
+module github.com/whisperingchaos/cmdp
 
 go 1.14
 
