@@ -1,5 +1,5 @@
 /*
-Package cmdp offers an interface to launch a concurrent Command Processor within the starting console.
+Package cmdp implements rudimentdary,concurrent console Command Processor.
 */
 package cmdp
 
@@ -65,7 +65,7 @@ type Parser interface {
 
 /*
 Runner accepts string forms of a command's arguments, returned by the Parser
-and then executes the command.  Use a clousure to bind the appropriate
+and then executes the command.  Use a closure to bind the appropriate
 state needed to submit commands to the "backend" processor.
 Errors returned by the Run command are written to STDERR by the command
 processor.
@@ -100,19 +100,24 @@ a cooperative shutdown by sending 'true'.  The Command Processor will close
 the shutdown channel to signal its completion of a graceful shutdown.
 */
 func Start(cds []Cdef) (shutdown chan bool, err error) {
+	return start(cds, bufio.NewReader(os.Stdin))
+}
+
+//-----------------------------------------------------------------------------
+//--                            private section                              --
+//-----------------------------------------------------------------------------
+
+// Created function to ease testing by allowing mock of STDIN
+func start(cds []Cdef, rCmdLn *bufio.Reader) (shutdown chan bool, err error) {
 	var cs *cmds
 	cs, err = validate(cds)
 	if err != nil {
 		return nil, err
 	}
 	shutdown = make(chan bool)
-	go processCmdLn(cs.cmmds, shutdown)
+	go processCmdLn(cs.cmmds, shutdown, rCmdLn)
 	return shutdown, nil
 }
-
-//-----------------------------------------------------------------------------
-//--                            private section                              --
-//-----------------------------------------------------------------------------
 
 type cdef struct {
 	Cdef
@@ -189,9 +194,9 @@ func cdefVerify(c Cdef, altNm string) (errs error) {
 func errorsConcat(errs error, err error) (errcat error) {
 	return fmt.Errorf("%s%s\n", errs, err)
 }
-func processCmdLn(cmds []cdef, shutdown chan bool) {
+func processCmdLn(cmds []cdef, shutdown chan bool, rCmdLn *bufio.Reader) {
 	defer close(shutdown)
-	resp := responseConfig()
+	resp := responseConfig(rCmdLn)
 	for {
 		select {
 		case cmdLn, ok := <-resp:
@@ -206,20 +211,20 @@ func processCmdLn(cmds []cdef, shutdown chan bool) {
 		}
 	}
 }
-func responseConfig() (response <-chan string) {
+func responseConfig(rCmdLn *bufio.Reader) (response <-chan string) {
 	resp := make(chan string)
-	go responseFetch(resp)
+	go responseFetch(resp, rCmdLn)
 	return resp
 }
-func responseFetch(resp chan<- string) {
+func responseFetch(resp chan<- string, rCmdLn *bufio.Reader) {
 	defer close(resp)
-	stdin := bufio.NewReader(os.Stdin)
 	for {
 		// general issue with golang when integrating blocking i/o
-		// especially without deadline support.
-		// This routing will always survive shutdown request until
-		// main function (goroutine) terminates.
-		cmdLn, err := stdin.ReadString('\n')
+		// especially without deadline support.  This routing will
+		// always survive shutdown request until main function
+		// (goroutine) terminates.  When it does terminate, it will
+		// issue an io.EOF error.  The code below ignores this error.
+		cmdLn, err := rCmdLn.ReadString('\n')
 		if err != nil {
 			fmt.Printf("Abort: unexpected %s\n", err)
 			break
